@@ -62,7 +62,7 @@ public class LeagueVersionControl
 
         // 4. Update collections
         _repositoryIndex!.AvailablePatches.Add(patchVersion!);
-        await WriteRepositoryIndex(GetRepositoryIndex());
+        await WriteRepositoryIndex();
     }
 
     public async Task<string> ExportPatch(string patchVersion,
@@ -76,7 +76,7 @@ public class LeagueVersionControl
         }
 
         // 2. Load patch file
-        var patch = await ReadPatchFile(GetPatchFilePath(patchVersion));
+        var patch = await ReadPatchFile(patchVersion);
 
         // 3. Copy files / create links to export directory
         var lolExePath = string.Empty;
@@ -116,6 +116,9 @@ public class LeagueVersionControl
             progress.NullSafeReport(progressCount * 100 / progressLimit);
         }
 
+        // remember what patch is currently exported
+        _repositoryIndex.CurrentExportedPatch = patchVersion;
+        await WriteRepositoryIndex();
         // 4. Return executable path
         return lolExePath;
     }
@@ -282,8 +285,9 @@ public class LeagueVersionControl
             ?? throw new Exception("Failed to deserialize repository index");
     }
 
-    private async Task WriteRepositoryIndex(string repositoryIndexFilePath)
+    private async Task WriteRepositoryIndex()
     {
+        var repositoryIndexFilePath = GetRepositoryIndex();
         if (_repositoryIndex == null)
         {
             throw new Exception("Repository index is null, cannot be written");
@@ -293,8 +297,9 @@ public class LeagueVersionControl
         await JsonSerializer.SerializeAsync<RepositoryIndex>(index, _repositoryIndex);
     }
 
-    private async Task<Patch> ReadPatchFile(string patchFilePath)
+    private async Task<Patch> ReadPatchFile(string patchVersion)
     {
+        var patchFilePath = GetPatchFilePath(patchVersion);
         using FileStream fileStream = new(patchFilePath, FileMode.Open);
         return await JsonSerializer.DeserializeAsync<Patch>(fileStream)
             ?? throw new Exception("Failed to deserialize patch file");
