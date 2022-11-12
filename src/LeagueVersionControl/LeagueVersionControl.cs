@@ -65,14 +65,60 @@ public class LeagueVersionControl
         await WriteRepositoryIndex(GetRepositoryIndex());
     }
 
-    //public async Task<string> ExportPatch(string patchVersion)
-    //{
-    //    // 1. Check if trying to export a version that does not exist
-    //    // 2. Load patch file
-    //    // 3. Copy files / create links to export directory
-    //    //     3.a. Ensure WAD headers are intact
-    //    // 4. Return executable path
-    //}
+    public async Task<string> ExportPatch(string patchVersion,
+        IProgress<int>? progress = default,
+        CancellationToken cancellationToken = default)
+    {
+        // 1. Check if trying to export a version that does not exist
+        if (!_repositoryIndex.AvailablePatches.Contains(patchVersion))
+        {
+            throw new Exception($"Patch {patchVersion} does not exist");
+        }
+
+        // 2. Load patch file
+        var patch = await ReadPatchFile(GetPatchFilePath(patchVersion));
+
+        // 3. Copy files / create links to export directory
+        var lolExePath = string.Empty;
+        // setup progress
+        var progressCount = 0;
+        var progressLimit = patch.FileHashes.Count;
+        progress.NullSafeReport(progressCount);
+
+        foreach (var (destinationRelativePath, hash) in patch.FileHashes)
+        {
+            var destinationFilePath = Path.Combine(_options.RepositoryPath, "export", destinationRelativePath);
+            // Ensure if destination folder exists
+            var destinationDirectory = Path.GetDirectoryName(destinationFilePath);
+            if (!Directory.Exists(destinationDirectory) && !string.IsNullOrEmpty(destinationDirectory))
+            {
+                Directory.CreateDirectory(destinationDirectory);
+            }
+
+            // Create/overwrite destination file
+            using FileStream destinationStream = new(destinationFilePath, FileMode.Create);
+            // Copy wad header first
+            if (destinationFilePath.EndsWith(".wad.client"))
+            {
+                await destinationStream.WriteAsync(patch.WadHeader, cancellationToken);
+            }
+
+            // Copy source file from repository
+            using FileStream sourceStream = new(GetRepositoryFilePath(hash), FileMode.Open);
+            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+
+            if (string.IsNullOrEmpty(lolExePath) && destinationFilePath.EndsWith("League of Legends.exe"))
+            {
+                lolExePath = destinationFilePath;
+            }
+
+            // Report progress
+            progress.NullSafeReport(progressCount * 100 / progressLimit);
+        }
+
+        // 4. Return executable path
+        return lolExePath;
+    }
 
     #endregion
 
@@ -218,7 +264,7 @@ public class LeagueVersionControl
 
             // report on current progress
             currentProgress++;
-            progress.NullSafeReport(currentProgress / totalFiles * 100);
+            progress.NullSafeReport(currentProgress * 100 / totalFiles);
         }
 
         if (wadHeader == null)
@@ -245,6 +291,13 @@ public class LeagueVersionControl
 
         using FileStream index = new(repositoryIndexFilePath, FileMode.Create);
         await JsonSerializer.SerializeAsync<RepositoryIndex>(index, _repositoryIndex);
+    }
+
+    private async Task<Patch> ReadPatchFile(string patchFilePath)
+    {
+        using FileStream fileStream = new(patchFilePath, FileMode.Open);
+        return await JsonSerializer.DeserializeAsync<Patch>(fileStream)
+            ?? throw new Exception("Failed to deserialize patch file");
     }
 
     #endregion
