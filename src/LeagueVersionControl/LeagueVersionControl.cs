@@ -117,7 +117,7 @@ public class LeagueVersionControl
         }
 
         // remember what patch is currently exported
-        _repositoryIndex.CurrentExportedPatch = patchVersion;
+        _repositoryIndex.LastExportedPatch = patchVersion;
         await WriteRepositoryIndex();
         // 4. Return executable path
         return lolExePath;

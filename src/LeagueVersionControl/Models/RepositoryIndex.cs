@@ -7,7 +7,7 @@ public class RepositoryIndex
     [JsonPropertyName("availablePatches")]
     public List<string> AvailablePatches { get; set; } = new List<string>();
 
-    [JsonPropertyName("currentExportedPatch")]
-    public string CurrentExportedPatch { get; set; } = string.Empty;
+    [JsonPropertyName("lastExportedPatch")]
+    public string LastExportedPatch { get; set; } = string.Empty;
 
 }
