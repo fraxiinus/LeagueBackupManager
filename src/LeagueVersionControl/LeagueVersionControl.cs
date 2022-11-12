@@ -33,6 +33,8 @@ public class LeagueVersionControl
     /// <returns></returns>
     public string[] GetAvailablePatches() => _repositoryIndex?.AvailablePatches?.ToArray() ?? Array.Empty<string>();
 
+    public string GetLastExportedPatch() => _repositoryIndex?.LastExportedPatch ?? string.Empty;
+
     /// <summary>
     /// Loads the provided league of legends copy into repository
     /// </summary>
@@ -97,11 +99,6 @@ public class LeagueVersionControl
 
             // Create/overwrite destination file
             using FileStream destinationStream = new(destinationFilePath, FileMode.Create);
-            // Copy wad header first
-            if (destinationFilePath.EndsWith(".wad.client"))
-            {
-                await destinationStream.WriteAsync(patch.WadHeader, cancellationToken);
-            }
 
             // Copy source file from repository
             using FileStream sourceStream = new(GetRepositoryFilePath(hash), FileMode.Open);
@@ -196,12 +193,11 @@ public class LeagueVersionControl
         IProgress<int>? progress = default,
         CancellationToken cancellationToken = default)
     {
-        var (wadHeader, hashes) = await AddToRepository(inputLolPath, regexFileFilters, progress, cancellationToken);
+        var hashes = await AddToRepository(inputLolPath, regexFileFilters, progress, cancellationToken);
 
         var patch = new Patch()
         {
             Version = patchVersion,
-            WadHeader = wadHeader,
             FileHashes = hashes
         };
 
@@ -212,15 +208,13 @@ public class LeagueVersionControl
         return patch;
     }
 
-    private async Task<(byte[] wadHeader, Dictionary<string, string> hashes)> AddToRepository(
+    private async Task<Dictionary<string, string>> AddToRepository(
         string inputLolPath,
         List<Regex> regexFileFilters,
         IProgress<int>? progress = default,
         CancellationToken cancellationToken = default)
     {
         var rootDirectory = new DirectoryInfo(inputLolPath);
-        // The header is the same across the entire patch
-        byte[]? wadHeader = null;
         var hashes = new Dictionary<string, string>();
         // enumerate all files, including subdirectories
         var allFiles = rootDirectory.EnumerateFiles("*", SearchOption.AllDirectories);
@@ -236,14 +230,8 @@ public class LeagueVersionControl
 
             using FileStream fileStream = new(file.FullName, FileMode.Open);
 
-            // If wad header has not been found yet, extract from wad file
-            if (wadHeader == null && file.Name.EndsWith(".wad.client"))
-            {
-                wadHeader = await fileStream.ReadBytesAsync(4, cancellationToken);
-            }
-
             // Find potential destination file path, wad files skip first 4 bytes
-            var md5Hash = fileStream.ComputeMD5Hash();
+            var md5Hash = await fileStream.ComputeMD5Hash();
             hashes.Add(relativePath, md5Hash);
 
             var destinationFile = GetRepositoryFilePath(md5Hash);
@@ -270,12 +258,7 @@ public class LeagueVersionControl
             progress.NullSafeReport(currentProgress * 100 / totalFiles);
         }
 
-        if (wadHeader == null)
-        {
-            throw new Exception("WAD header was not found!");
-        }
-
-        return (wadHeader, hashes);
+        return hashes;
     }
 
     private async Task ReadRepositoryIndex(string repositoryIndexFilePath)

@@ -38,10 +38,10 @@ public static class FileStreamExtensions
     /// </summary>
     /// <param name="fileStream"></param>
     /// <returns></returns>
-    public static string ComputeMD5Hash(this FileStream fileStream)
+    public static async Task<string> ComputeMD5Hash(this FileStream fileStream)
     {
         using var md5 = MD5.Create();
-        var hashArray = md5.ComputeHash(fileStream);
+        var hashArray = await md5.ComputeHashAsync(fileStream);
         return Convert.ToHexString(hashArray);
     }
 }

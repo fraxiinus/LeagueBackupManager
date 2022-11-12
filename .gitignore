@@ -28,3 +28,4 @@ riderModule.iml
 bld/
 [Bb]in/
 [Oo]bj/
+/src/MainCLI/Properties/launchSettings.json
