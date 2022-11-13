@@ -20,14 +20,14 @@ public class Program
             new Command("import", "Import patch into repository")
             {
                 new Argument<string>("path", "Folder containing League of Legends.exe")
-            }.WithHandler(nameof(HandleImportCommand)), 
+            }.WithHandler(nameof(HandleImportCommand)),
             new Command("export", "Export patch from repository")
             {
-                new Argument<string>("version", "Version of patch to export")
+                new Argument<string>("patchVersion", "Version of patch to export")
             }.WithHandler(nameof(HandleExportCommand)),
             new Command("delete", "Delete patch from repository")
             {
-                new Argument<string>("version", "Version of patch to delete")
+                new Argument<string>("patchVersion", "Version of patch to delete")
             }
         };
     }
@@ -60,7 +60,7 @@ public class Program
     {
         var repository = await LoadRepository();
         var progress = new Progress<int>(x => Console.Write($"\rExporting...{x}%"));
-        await repository.ExportPatch(patchVersion, progress);
+        await repository.ExportPatch(patchVersion, progress: progress);
         Console.WriteLine("\nDone!");
     }
 

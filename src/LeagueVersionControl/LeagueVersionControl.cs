@@ -68,6 +68,8 @@ public class LeagueVersionControl
     }
 
     public async Task<string> ExportPatch(string patchVersion,
+        string exportDestination = "",
+        bool useHardLinks = true,
         IProgress<int>? progress = default,
         CancellationToken cancellationToken = default)
     {
@@ -82,6 +84,12 @@ public class LeagueVersionControl
 
         // 3. Copy files / create links to export directory
         var lolExePath = string.Empty;
+        // use repository path if export destination is not provided
+        exportDestination = string.IsNullOrEmpty(exportDestination)
+            ? Path.Combine(_options.RepositoryPath, "export")
+            : exportDestination;
+
+
         // setup progress
         var progressCount = 0;
         var progressLimit = patch.FileHashes.Count;
@@ -89,7 +97,7 @@ public class LeagueVersionControl
 
         foreach (var (destinationRelativePath, hash) in patch.FileHashes)
         {
-            var destinationFilePath = Path.Combine(_options.RepositoryPath, "export", destinationRelativePath);
+            var destinationFilePath = Path.Combine(exportDestination, destinationRelativePath);
             // Ensure if destination folder exists
             var destinationDirectory = Path.GetDirectoryName(destinationFilePath);
             if (!Directory.Exists(destinationDirectory) && !string.IsNullOrEmpty(destinationDirectory))
@@ -97,12 +105,25 @@ public class LeagueVersionControl
                 Directory.CreateDirectory(destinationDirectory);
             }
 
-            // Create/overwrite destination file
-            using FileStream destinationStream = new(destinationFilePath, FileMode.Create);
+            // overwrite existing files
+            if (File.Exists(destinationFilePath))
+            {
+                File.Delete(destinationFilePath);
+            }
 
-            // Copy source file from repository
-            using FileStream sourceStream = new(GetRepositoryFilePath(hash), FileMode.Open);
-            await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+            if (useHardLinks)
+            {
+                NativeMethods.CreateHardLink(destinationFilePath, GetRepositoryFilePath(hash), IntPtr.Zero);
+            }
+            else
+            {
+                // Create/overwrite destination file
+                using FileStream destinationStream = new(destinationFilePath, FileMode.Create);
+
+                // Copy source file from repository
+                using FileStream sourceStream = new(GetRepositoryFilePath(hash), FileMode.Open);
+                await sourceStream.CopyToAsync(destinationStream, cancellationToken);
+            }
 
             if (string.IsNullOrEmpty(lolExePath) && destinationFilePath.EndsWith("League of Legends.exe"))
             {
@@ -242,11 +263,11 @@ public class LeagueVersionControl
                 // reset filestream
                 fileStream.Seek(0, SeekOrigin.Begin);
 
-                if (file.Name.EndsWith(".wad.client"))
-                {
-                    // skip 4 bytes when writing wad files, to be filled by wadHeader
-                    fileStream.Seek(4, SeekOrigin.Begin);
-                }
+                //if (file.Name.EndsWith(".wad.client"))
+                //{
+                //    // skip 4 bytes when writing wad files, to be filled by wadHeader
+                //    fileStream.Seek(4, SeekOrigin.Begin);
+                //}
 
                 // create destination stream and copy async
                 using FileStream destinationStream = new(destinationFile, FileMode.Create);
