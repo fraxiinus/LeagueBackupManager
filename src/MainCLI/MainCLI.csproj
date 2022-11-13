@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>Fraxiinus.LeagueBackupManager.$(MSBuildProjectName.Replace(" ", "_"))</RootNamespace>
+    <AssemblyName>LeagueBackupManager</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
